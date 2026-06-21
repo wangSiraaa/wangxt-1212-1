@@ -43,3 +43,15 @@ export const completeFlightDeicing = (id) => {
 export const getFlightList = (params) => {
   return request.get('/flights/page', { params: { ...params, pageNum: 1, pageSize: 1000 } }).then(res => res.records || [])
 }
+
+export const markRiskRemark = (id, data) => {
+  return request.post(`/flights/${id}/risk-remark`, data)
+}
+
+export const clearRiskRemark = (id, params) => {
+  return request.delete(`/flights/${id}/risk-remark`, { params })
+}
+
+export const getRiskRemarkHistory = (id) => {
+  return request.get(`/flights/${id}/risk-remark/history`)
+}

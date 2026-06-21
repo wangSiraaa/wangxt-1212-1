@@ -3,8 +3,10 @@ package com.airport.deicing.service.impl;
 import com.airport.deicing.common.PageResult;
 import com.airport.deicing.common.ResultCode;
 import com.airport.deicing.entity.Flight;
+import com.airport.deicing.entity.RiskRemarkHistory;
 import com.airport.deicing.exception.BusinessException;
 import com.airport.deicing.mapper.FlightMapper;
+import com.airport.deicing.mapper.RiskRemarkHistoryMapper;
 import com.airport.deicing.service.FlightService;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
@@ -26,6 +28,8 @@ import java.util.Map;
 @Service
 @RequiredArgsConstructor
 public class FlightServiceImpl extends ServiceImpl<FlightMapper, Flight> implements FlightService {
+
+    private final RiskRemarkHistoryMapper riskRemarkHistoryMapper;
 
     @Override
     public PageResult<Flight> getFlightPage(Long pageNum, Long pageSize, String flightNo, String flightStatus, String airline) {
@@ -74,6 +78,9 @@ public class FlightServiceImpl extends ServiceImpl<FlightMapper, Flight> impleme
         }
         if (flight.getFlightStatus() == null) {
             flight.setFlightStatus("SCHEDULED");
+        }
+        if (flight.getHasRiskRemark() == null) {
+            flight.setHasRiskRemark(false);
         }
         return this.save(flight);
     }
@@ -155,9 +162,103 @@ public class FlightServiceImpl extends ServiceImpl<FlightMapper, Flight> impleme
         if ("DEPARTED".equals(flight.getFlightStatus())) {
             throw new BusinessException(ResultCode.FLIGHT_ALREADY_DEPARTED);
         }
+        if (Boolean.TRUE.equals(flight.getDeicingCompleted())) {
+            throw new BusinessException(ResultCode.DEICING_ALREADY_COMPLETED);
+        }
+
         flight.setDeicingCompleted(true);
         flight.setFlightStatus("DEICED");
         flight.setUpdateTime(LocalDateTime.now());
+
+        if (Boolean.TRUE.equals(flight.getHasRiskRemark())) {
+            flight.setHasRiskRemark(false);
+            flight.setRiskClearBy("系统自动");
+            flight.setRiskClearTime(LocalDateTime.now());
+
+            LambdaQueryWrapper<RiskRemarkHistory> wrapper = new LambdaQueryWrapper<>();
+            wrapper.eq(RiskRemarkHistory::getFlightId, flightId)
+                   .isNull(RiskRemarkHistory::getClearTime)
+                   .orderByDesc(RiskRemarkHistory::getMarkTime)
+                   .last("LIMIT 1");
+            RiskRemarkHistory history = riskRemarkHistoryMapper.selectOne(wrapper);
+            if (history != null) {
+                history.setClearedBy("系统自动");
+                history.setClearTime(LocalDateTime.now());
+                history.setClearType("DEICING_COMPLETED");
+                history.setUpdateTime(LocalDateTime.now());
+                riskRemarkHistoryMapper.updateById(history);
+            }
+        }
+
         return this.updateById(flight);
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public boolean markRiskRemark(Long flightId, String riskReason, String operator) {
+        Flight flight = this.getFlightById(flightId);
+        if (Boolean.TRUE.equals(flight.getDeicingCompleted())) {
+            throw new BusinessException(ResultCode.DEICING_ALREADY_COMPLETED);
+        }
+        if ("DEPARTED".equals(flight.getFlightStatus())) {
+            throw new BusinessException(ResultCode.FLIGHT_ALREADY_DEPARTED);
+        }
+
+        flight.setHasRiskRemark(true);
+        flight.setRiskReason(riskReason);
+        flight.setRiskMarkedBy(operator);
+        flight.setRiskMarkTime(LocalDateTime.now());
+        flight.setUpdateTime(LocalDateTime.now());
+
+        RiskRemarkHistory history = new RiskRemarkHistory();
+        history.setFlightId(flightId);
+        history.setFlightNo(flight.getFlightNo());
+        history.setRiskReason(riskReason);
+        history.setMarkedBy(operator);
+        history.setMarkTime(LocalDateTime.now());
+        history.setCreateTime(LocalDateTime.now());
+        history.setUpdateTime(LocalDateTime.now());
+        riskRemarkHistoryMapper.insert(history);
+
+        return this.updateById(flight);
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public boolean clearRiskRemark(Long flightId, String operator, String clearType) {
+        Flight flight = this.getFlightById(flightId);
+        if (!Boolean.TRUE.equals(flight.getHasRiskRemark())) {
+            return true;
+        }
+
+        LambdaQueryWrapper<RiskRemarkHistory> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(RiskRemarkHistory::getFlightId, flightId)
+               .isNull(RiskRemarkHistory::getClearTime)
+               .orderByDesc(RiskRemarkHistory::getMarkTime)
+               .last("LIMIT 1");
+        RiskRemarkHistory history = riskRemarkHistoryMapper.selectOne(wrapper);
+
+        if (history != null) {
+            history.setClearedBy(operator);
+            history.setClearTime(LocalDateTime.now());
+            history.setClearType(clearType);
+            history.setUpdateTime(LocalDateTime.now());
+            riskRemarkHistoryMapper.updateById(history);
+        }
+
+        flight.setHasRiskRemark(false);
+        flight.setRiskClearBy(operator);
+        flight.setRiskClearTime(LocalDateTime.now());
+        flight.setUpdateTime(LocalDateTime.now());
+
+        return this.updateById(flight);
+    }
+
+    @Override
+    public List<RiskRemarkHistory> getRiskRemarkHistory(Long flightId) {
+        LambdaQueryWrapper<RiskRemarkHistory> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(RiskRemarkHistory::getFlightId, flightId)
+               .orderByDesc(RiskRemarkHistory::getMarkTime);
+        return riskRemarkHistoryMapper.selectList(wrapper);
     }
 }

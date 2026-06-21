@@ -23,11 +23,42 @@ CREATE TABLE `flight` (
   `create_time` datetime DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   `update_time` datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
   `remark` varchar(500) DEFAULT NULL COMMENT '备注',
+  `has_risk_remark` tinyint(1) DEFAULT '0' COMMENT '是否有风险备注',
+  `risk_reason` varchar(500) DEFAULT NULL COMMENT '风险原因',
+  `risk_marked_by` varchar(64) DEFAULT NULL COMMENT '风险标记人',
+  `risk_mark_time` datetime DEFAULT NULL COMMENT '风险标记时间',
+  `risk_clear_by` varchar(64) DEFAULT NULL COMMENT '风险清除人',
+  `risk_clear_time` datetime DEFAULT NULL COMMENT '风险清除时间',
   PRIMARY KEY (`id`),
   UNIQUE KEY `uk_flight_no` (`flight_no`),
   KEY `idx_scheduled_departure` (`scheduled_departure_time`),
-  KEY `idx_flight_status` (`flight_status`)
+  KEY `idx_flight_status` (`flight_status`),
+  KEY `idx_has_risk_remark` (`has_risk_remark`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='航班表';
+
+-- ----------------------------
+-- 风险备注历史表
+-- ----------------------------
+DROP TABLE IF EXISTS `risk_remark_history`;
+CREATE TABLE `risk_remark_history` (
+  `id` bigint NOT NULL AUTO_INCREMENT COMMENT '主键ID',
+  `flight_id` bigint NOT NULL COMMENT '航班ID',
+  `flight_no` varchar(32) DEFAULT NULL COMMENT '航班号',
+  `risk_reason` varchar(500) DEFAULT NULL COMMENT '风险原因',
+  `marked_by` varchar(64) DEFAULT NULL COMMENT '标记人',
+  `mark_time` datetime DEFAULT NULL COMMENT '标记时间',
+  `cleared_by` varchar(64) DEFAULT NULL COMMENT '清除人',
+  `clear_time` datetime DEFAULT NULL COMMENT '清除时间',
+  `clear_type` varchar(32) DEFAULT NULL COMMENT '清除类型：MANUAL-手动清除，DEICING_COMPLETED-除冰完成自动清除',
+  `remark` varchar(500) DEFAULT NULL COMMENT '备注',
+  `create_time` datetime DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `update_time` datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  `deleted` tinyint(1) DEFAULT '0' COMMENT '是否删除',
+  PRIMARY KEY (`id`),
+  KEY `idx_flight_id` (`flight_id`),
+  KEY `idx_flight_no` (`flight_no`),
+  KEY `idx_mark_time` (`mark_time`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='风险备注历史表';
 
 -- ----------------------------
 -- 车辆表（除冰车）

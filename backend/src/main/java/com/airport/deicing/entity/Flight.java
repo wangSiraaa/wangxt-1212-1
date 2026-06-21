@@ -47,6 +47,18 @@ public class Flight implements Serializable {
 
     private String remark;
 
+    private Boolean hasRiskRemark;
+
+    private String riskReason;
+
+    private String riskMarkedBy;
+
+    private LocalDateTime riskMarkTime;
+
+    private String riskClearBy;
+
+    private LocalDateTime riskClearTime;
+
     @TableLogic
     private Integer deleted;
 }

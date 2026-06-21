@@ -1,6 +1,7 @@
 package com.airport.deicing.service;
 
 import com.airport.deicing.entity.Flight;
+import com.airport.deicing.entity.RiskRemarkHistory;
 import com.airport.deicing.common.PageResult;
 import com.baomidou.mybatisplus.extension.service.IService;
 
@@ -28,4 +29,10 @@ public interface FlightService extends IService<Flight> {
     Map<String, Object> checkFlightDeicingStatus(Long flightId);
 
     boolean completeDeicing(Long flightId);
+
+    boolean markRiskRemark(Long flightId, String riskReason, String operator);
+
+    boolean clearRiskRemark(Long flightId, String operator, String clearType);
+
+    List<RiskRemarkHistory> getRiskRemarkHistory(Long flightId);
 }

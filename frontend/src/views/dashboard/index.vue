@@ -44,7 +44,7 @@
               class="flight-card"
               :class="getFlightCardClass(flight)"
             >
-              <div class="flight-card-header">
+              <div class="flight-card-header" @click="openRiskPanel(flight)">
                 <span class="flight-no">{{ flight.flightNo }}</span>
                 <div class="flight-status">
                   <n-tag :type="getFlightStatusType(flight)" size="small">
@@ -73,6 +73,12 @@
                 <span v-else>
                   无需除冰
                 </span>
+              </div>
+              <div v-if="flight.hasRiskRemark && flight.riskReason" class="risk-reason">
+                <n-icon size="12" color="#ef4444">
+                  <WarningFilled />
+                </n-icon>
+                <span class="risk-reason-text">{{ flight.riskReason }}</span>
               </div>
             </div>
           </div>
@@ -166,6 +172,114 @@
         </div>
       </div>
     </div>
+
+    <n-modal
+      v-model:show="riskPanelVisible"
+      preset="card"
+      title="航班风险备注"
+      style="width: 600px"
+      :mask-closable="true"
+    >
+      <div v-if="currentFlight" class="risk-panel">
+        <div class="risk-panel-header">
+          <span class="risk-panel-flight">{{ currentFlight.flightNo }}</span>
+          <n-tag :type="getFlightStatusType(currentFlight)" size="small">
+            {{ getFlightStatusText(currentFlight) }}
+          </n-tag>
+        </div>
+
+        <div class="risk-panel-section">
+          <div class="risk-panel-section-title">当前风险状态</div>
+          <div v-if="currentFlight.hasRiskRemark" class="risk-status risk-status-active">
+            <n-icon size="16" color="#ef4444">
+              <WarningFilled />
+            </n-icon>
+            <span>存在风险备注</span>
+          </div>
+          <div v-else class="risk-status risk-status-normal">
+            <n-icon size="16" color="#10b981">
+              <CheckCircleFilled />
+            </n-icon>
+            <span>无风险备注</span>
+          </div>
+        </div>
+
+        <div v-if="currentFlight.hasRiskRemark" class="risk-panel-section">
+          <div class="risk-panel-section-title">风险原因</div>
+          <div class="risk-reason-detail">
+            <p>{{ currentFlight.riskReason }}</p>
+            <div class="risk-meta">
+              <span>标记人：{{ currentFlight.riskMarkedBy || '未知' }}</span>
+              <span>标记时间：{{ formatDateTime(currentFlight.riskMarkTime) }}</span>
+            </div>
+          </div>
+        </div>
+
+        <div v-if="!currentFlight.deicingCompleted && currentFlight.flightStatus !== 'DEPARTED'" class="risk-panel-section">
+          <div class="risk-panel-section-title">操作</div>
+          <div class="risk-actions">
+            <n-input
+              v-model:value="riskReasonInput"
+              type="textarea"
+              :rows="3"
+              placeholder="请输入风险原因..."
+              maxlength="500"
+              show-count
+            />
+            <div class="risk-action-buttons">
+              <n-button
+                v-if="!currentFlight.hasRiskRemark"
+                type="warning"
+                @click="handleMarkRisk"
+                :disabled="!riskReasonInput.trim()"
+              >
+                标记风险
+              </n-button>
+              <n-button
+                v-else
+                type="success"
+                @click="handleClearRisk"
+              >
+                清除风险备注
+              </n-button>
+            </div>
+          </div>
+        </div>
+
+        <div class="risk-panel-section">
+          <div class="risk-panel-section-title">历史记录</div>
+          <div v-if="riskHistory.length === 0" class="empty-history">
+            暂无历史记录
+          </div>
+          <div v-else class="risk-history-list">
+            <div
+              v-for="(item, index) in riskHistory"
+              :key="item.id"
+              class="risk-history-item"
+            >
+              <div class="risk-history-dot"></div>
+              <div class="risk-history-content">
+                <div class="risk-history-reason">{{ item.riskReason }}</div>
+                <div class="risk-history-meta">
+                  <span>标记人：{{ item.markedBy || '未知' }}</span>
+                  <span>标记时间：{{ formatDateTime(item.markTime) }}</span>
+                </div>
+                <div v-if="item.clearTime" class="risk-history-cleared">
+                  <n-tag size="small" type="success">
+                    已清除
+                  </n-tag>
+                  <span class="clear-info">
+                    {{ item.clearedBy || '未知' }} · 
+                    {{ getClearTypeText(item.clearType) }} · 
+                    {{ formatDateTime(item.clearTime) }}
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </n-modal>
   </div>
 </template>
 
@@ -181,12 +295,22 @@ import {
   EnvironmentOutlined,
   WarningFilled,
   WarningOutlined,
-  ClockCircleOutlined
+  ClockCircleOutlined,
+  CheckCircleFilled
 } from '@vicons/antd'
+import { useMessage } from 'naive-ui'
 import dayjs from 'dayjs'
+import { markRiskRemark, clearRiskRemark, getRiskRemarkHistory } from '@/api/flight'
 
 const router = useRouter()
 const dashboardStore = useDashboardStore()
+const message = useMessage()
+
+const riskPanelVisible = ref(false)
+const currentFlight = ref(null)
+const riskReasonInput = ref('')
+const riskHistory = ref([])
+const submitting = ref(false)
 
 const loading = computed(() => dashboardStore.loading)
 
@@ -297,11 +421,88 @@ function getFlightStatusText(flight) {
 }
 
 function hasDeicingRisk(flight) {
+  if (flight.hasRiskRemark) return true
   if (!flight.deicingRequired) return false
   if (flight.deicingCompleted) return false
   if (flight.flightStatus === 'DEPARTED') return true
   if (flight.flightStatus === 'CANCELLED') return false
   return false
+}
+
+function formatDateTime(time) {
+  if (!time) return '--'
+  return dayjs(time).format('YYYY-MM-DD HH:mm')
+}
+
+function getClearTypeText(clearType) {
+  const map = {
+    MANUAL: '手动清除',
+    DEICING_COMPLETED: '除冰完成自动清除'
+  }
+  return map[clearType] || '未知'
+}
+
+function openRiskPanel(flight) {
+  currentFlight.value = { ...flight }
+  riskReasonInput.value = ''
+  riskHistory.value = []
+  riskPanelVisible.value = true
+  loadRiskHistory(flight.id)
+}
+
+async function loadRiskHistory(flightId) {
+  try {
+    const data = await getRiskRemarkHistory(flightId)
+    riskHistory.value = data || []
+  } catch (error) {
+    console.error('获取风险备注历史失败:', error)
+  }
+}
+
+async function handleMarkRisk() {
+  if (!currentFlight.value || !riskReasonInput.value.trim()) return
+  
+  submitting.value = true
+  try {
+    await markRiskRemark(currentFlight.value.id, {
+      riskReason: riskReasonInput.value.trim(),
+      operator: '机务调度员'
+    })
+    message.success('风险备注标记成功')
+    currentFlight.value.hasRiskRemark = true
+    currentFlight.value.riskReason = riskReasonInput.value.trim()
+    currentFlight.value.riskMarkedBy = '机务调度员'
+    currentFlight.value.riskMarkTime = new Date().toISOString()
+    riskReasonInput.value = ''
+    loadRiskHistory(currentFlight.value.id)
+    dashboardStore.fetchRealtimeData()
+  } catch (error) {
+    message.error('标记风险备注失败：' + (error.message || '未知错误'))
+  } finally {
+    submitting.value = false
+  }
+}
+
+async function handleClearRisk() {
+  if (!currentFlight.value) return
+  
+  submitting.value = true
+  try {
+    await clearRiskRemark(currentFlight.value.id, {
+      operator: '机务调度员',
+      clearType: 'MANUAL'
+    })
+    message.success('风险备注已清除')
+    currentFlight.value.hasRiskRemark = false
+    currentFlight.value.riskClearBy = '机务调度员'
+    currentFlight.value.riskClearTime = new Date().toISOString()
+    loadRiskHistory(currentFlight.value.id)
+    dashboardStore.fetchRealtimeData()
+  } catch (error) {
+    message.error('清除风险备注失败：' + (error.message || '未知错误'))
+  } finally {
+    submitting.value = false
+  }
 }
 
 function getVehicleStatusType(vehicle) {
@@ -676,5 +877,182 @@ onUnmounted(() => {
   .dashboard-content {
     grid-template-columns: 1fr;
   }
+}
+
+.risk-reason {
+  margin-top: 8px;
+  padding: 6px 10px;
+  background: #fef2f2;
+  border-radius: 4px;
+  font-size: 12px;
+  color: #991b1b;
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+}
+
+.risk-reason-text {
+  flex: 1;
+  line-height: 1.4;
+}
+
+.risk-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.risk-panel-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-bottom: 12px;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.risk-panel-flight {
+  font-size: 18px;
+  font-weight: 600;
+  color: #1f2937;
+}
+
+.risk-panel-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.risk-panel-section-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: #374151;
+}
+
+.risk-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  border-radius: 6px;
+  font-size: 14px;
+}
+
+.risk-status-active {
+  background: #fef2f2;
+  color: #991b1b;
+}
+
+.risk-status-normal {
+  background: #ecfdf5;
+  color: #065f46;
+}
+
+.risk-reason-detail {
+  padding: 12px;
+  background: #f9fafb;
+  border-radius: 6px;
+  border-left: 3px solid #ef4444;
+}
+
+.risk-reason-detail p {
+  margin: 0 0 8px 0;
+  font-size: 14px;
+  color: #1f2937;
+  line-height: 1.5;
+}
+
+.risk-meta {
+  display: flex;
+  gap: 16px;
+  font-size: 12px;
+  color: #6b7280;
+}
+
+.risk-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.risk-action-buttons {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.empty-history {
+  padding: 20px;
+  text-align: center;
+  color: #9ca3af;
+  font-size: 13px;
+}
+
+.risk-history-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+.risk-history-item {
+  display: flex;
+  gap: 12px;
+  position: relative;
+}
+
+.risk-history-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #f59e0b;
+  flex-shrink: 0;
+  margin-top: 4px;
+}
+
+.risk-history-item::after {
+  content: '';
+  position: absolute;
+  left: 4px;
+  top: 16px;
+  width: 2px;
+  height: calc(100% - 8px);
+  background: #e5e7eb;
+}
+
+.risk-history-item:last-child::after {
+  display: none;
+}
+
+.risk-history-content {
+  flex: 1;
+  padding-bottom: 12px;
+}
+
+.risk-history-reason {
+  font-size: 13px;
+  color: #1f2937;
+  margin-bottom: 4px;
+  line-height: 1.4;
+}
+
+.risk-history-meta {
+  display: flex;
+  gap: 12px;
+  font-size: 12px;
+  color: #6b7280;
+  margin-bottom: 6px;
+}
+
+.risk-history-cleared {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: #059669;
+}
+
+.clear-info {
+  color: #6b7280;
 }
 </style>

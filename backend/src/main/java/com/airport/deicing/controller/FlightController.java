@@ -3,6 +3,7 @@ package com.airport.deicing.controller;
 import com.airport.deicing.common.PageResult;
 import com.airport.deicing.common.Result;
 import com.airport.deicing.entity.Flight;
+import com.airport.deicing.entity.RiskRemarkHistory;
 import com.airport.deicing.service.FlightService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -87,5 +88,32 @@ public class FlightController {
     public Result<Void> completeDeicing(@PathVariable Long id) {
         flightService.completeDeicing(id);
         return Result.success();
+    }
+
+    @Operation(summary = "标记航班风险备注")
+    @PostMapping("/{id}/risk-remark")
+    public Result<Void> markRiskRemark(
+            @PathVariable Long id,
+            @RequestBody Map<String, String> request) {
+        String riskReason = request.get("riskReason");
+        String operator = request.get("operator");
+        flightService.markRiskRemark(id, riskReason, operator);
+        return Result.success();
+    }
+
+    @Operation(summary = "清除航班风险备注")
+    @DeleteMapping("/{id}/risk-remark")
+    public Result<Void> clearRiskRemark(
+            @PathVariable Long id,
+            @RequestParam(required = false) String operator,
+            @RequestParam(required = false, defaultValue = "MANUAL") String clearType) {
+        flightService.clearRiskRemark(id, operator, clearType);
+        return Result.success();
+    }
+
+    @Operation(summary = "获取航班风险备注历史")
+    @GetMapping("/{id}/risk-remark/history")
+    public Result<List<RiskRemarkHistory>> getRiskRemarkHistory(@PathVariable Long id) {
+        return Result.success(flightService.getRiskRemarkHistory(id));
     }
 }

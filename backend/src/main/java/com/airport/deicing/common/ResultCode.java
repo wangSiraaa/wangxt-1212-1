@@ -15,6 +15,8 @@ public enum ResultCode {
     FLIGHT_NOT_FOUND(1001, "航班不存在"),
     FLIGHT_DEICING_NOT_COMPLETED(1002, "航班除冰未完成，存在风险"),
     FLIGHT_ALREADY_DEPARTED(1003, "航班已起飞"),
+    DEICING_ALREADY_COMPLETED(1004, "航班已完成除冰，无需标记风险"),
+    RISK_REMARK_NOT_FOUND(1005, "风险备注不存在"),
 
     VEHICLE_NOT_FOUND(2001, "车辆不存在"),
     VEHICLE_NOT_AVAILABLE(2002, "车辆不可用"),

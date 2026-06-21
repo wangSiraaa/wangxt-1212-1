@@ -216,8 +216,10 @@ public class DashboardServiceImpl implements DashboardService {
         stats.put("openChecks", openChecks);
 
         long riskFlights = todayFlights.stream()
-            .filter(f -> Boolean.TRUE.equals(f.getDeicingRequired()) && Boolean.FALSE.equals(f.getDeicingCompleted()))
-            .filter(f -> "DEPARTED".equals(f.getFlightStatus()))
+            .filter(f -> Boolean.TRUE.equals(f.getHasRiskRemark())
+                || (Boolean.TRUE.equals(f.getDeicingRequired())
+                    && Boolean.FALSE.equals(f.getDeicingCompleted())
+                    && "DEPARTED".equals(f.getFlightStatus())))
             .count();
         stats.put("riskFlights", riskFlights);
 
