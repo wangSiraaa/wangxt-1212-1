@@ -25,7 +25,7 @@
             <n-tag size="small" type="info" @click="handleRefresh">
               <template #icon>
                 <n-icon size="12">
-                  <TimeCircleOutlined />
+                  <ClockCircleOutlined />
                 </n-icon>
               </template>
               每30秒自动刷新

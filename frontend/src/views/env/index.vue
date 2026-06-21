@@ -85,9 +85,9 @@
         <n-form-item label="回收池编号" path="poolNo">
           <n-input v-model:value="formData.poolNo" placeholder="请输入回收池编号" />
         </n-form-item>
-        <n-form-item label="关联回收记录" path="wasteRecoveryId">
+        <n-form-item label="关联回收记录" path="recoveryId">
           <n-select
-            v-model:value="formData.wasteRecoveryId"
+            v-model:value="formData.recoveryId"
             placeholder="请选择关联回收记录"
             :options="wasteOptions"
             filterable
@@ -227,7 +227,7 @@ const formData = reactive({
   id: null,
   checkNo: '',
   poolNo: '',
-  wasteRecoveryId: null,
+  recoveryId: null,
   standardConcentration: 30,
   concentration: 0,
   phValue: 7,
@@ -424,7 +424,7 @@ function resetForm() {
     id: null,
     checkNo: '',
     poolNo: '',
-    wasteRecoveryId: null,
+    recoveryId: null,
     standardConcentration: 30,
     concentration: 0,
     phValue: 7,

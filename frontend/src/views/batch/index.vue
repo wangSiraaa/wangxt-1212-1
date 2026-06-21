@@ -102,16 +102,16 @@
             style="width: 100%;"
           />
         </n-form-item>
-        <n-form-item label="最低有效温度" path="minEffectiveTemp">
+        <n-form-item label="最低有效温度" path="minValidTemperature">
           <n-input-number
-            v-model:value="formData.minEffectiveTemp"
+            v-model:value="formData.minValidTemperature"
             placeholder="请输入最低有效温度(°C)"
             style="width: 100%;"
           />
         </n-form-item>
-        <n-form-item label="最高有效温度" path="maxEffectiveTemp">
+        <n-form-item label="最高有效温度" path="maxValidTemperature">
           <n-input-number
-            v-model:value="formData.maxEffectiveTemp"
+            v-model:value="formData.maxValidTemperature"
             placeholder="请输入最高有效温度(°C)"
             style="width: 100%;"
           />
@@ -187,7 +187,7 @@ const fluidTypeOptions = [
 const statusOptions = [
   { label: '可用', value: 'AVAILABLE' },
   { label: '使用中', value: 'IN_USE' },
-  { label: '已用完', value: 'USED_UP' },
+  { label: '已用完', value: 'EMPTY' },
   { label: '已过期', value: 'EXPIRED' }
 ]
 
@@ -198,8 +198,8 @@ const formData = reactive({
   concentration: 50,
   totalVolume: 5000,
   remainingVolume: 5000,
-  minEffectiveTemp: -20,
-  maxEffectiveTemp: 10,
+  minValidTemperature: -20,
+  maxValidTemperature: 10,
   batchStatus: 'AVAILABLE',
   supplier: '',
   remark: ''
@@ -228,7 +228,7 @@ const columns = [
     title: '温度区间(°C)',
     key: 'tempRange',
     width: 130,
-    render: (row) => `${row.minEffectiveTemp} ~ ${row.maxEffectiveTemp}`
+    render: (row) => `${row.minValidTemperature} ~ ${row.maxValidTemperature}`
   },
   {
     title: '可用性',
@@ -236,7 +236,7 @@ const columns = [
     width: 100,
     render: (row) => {
       const valid = row.batchStatus === 'AVAILABLE' || row.batchStatus === 'IN_USE'
-      const tempValid = envTemp.value >= row.minEffectiveTemp && envTemp.value <= row.maxEffectiveTemp
+      const tempValid = envTemp.value >= row.minValidTemperature && envTemp.value <= row.maxValidTemperature
       if (valid && tempValid) {
         return h(NTag, { type: 'success', size: 'small' }, () => '可用')
       }
@@ -248,8 +248,8 @@ const columns = [
     key: 'batchStatus',
     width: 90,
     render: (row) => {
-      const typeMap = { AVAILABLE: 'success', IN_USE: 'info', USED_UP: 'warning', EXPIRED: 'error' }
-      const textMap = { AVAILABLE: '可用', IN_USE: '使用中', USED_UP: '已用完', EXPIRED: '已过期' }
+      const typeMap = { AVAILABLE: 'success', IN_USE: 'info', EMPTY: 'warning', EXPIRED: 'error' }
+      const textMap = { AVAILABLE: '可用', IN_USE: '使用中', EMPTY: '已用完', EXPIRED: '已过期' }
       return h(NTag, { type: typeMap[row.batchStatus] || 'default', size: 'small' }, () => textMap[row.batchStatus] || '未知')
     }
   },
@@ -356,8 +356,8 @@ function handleSubmit() {
 function resetForm() {
   Object.assign(formData, {
     id: null, batchNo: '', fluidType: 'TYPE1', concentration: 50,
-    totalVolume: 5000, remainingVolume: 5000, minEffectiveTemp: -20,
-    maxEffectiveTemp: 10, batchStatus: 'AVAILABLE', supplier: '', remark: ''
+    totalVolume: 5000, remainingVolume: 5000, minValidTemperature: -20,
+    maxValidTemperature: 10, batchStatus: 'AVAILABLE', supplier: '', remark: ''
   })
 }
 
